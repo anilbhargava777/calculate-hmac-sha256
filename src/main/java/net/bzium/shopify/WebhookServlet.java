@@ -110,8 +110,8 @@ public class WebhookServlet extends HttpServlet {
 		}
 		if (cart != null) {
 			for (int i = 0; i < cart.getLine_items().length; i++) {
-				System.out.println("Item: " + (i + 1) + " Quantity: "
-						+ cart.getLine_items()[i]);
+				System.out.println("\nItem: " + (i + 1) + " Quantity: "
+						+ cart.getLine_items()[i].getQuantity());
 			}
 		}
 	}
