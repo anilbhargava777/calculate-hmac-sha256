@@ -16,6 +16,7 @@ import org.eclipse.jetty.servlet.ServletHolder;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 
 import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -37,14 +38,15 @@ public class WebhookServlet extends HttpServlet {
 
 	public static final String HMAC_HEADER = "X-Shopify-Hmac-Sha256";
 	public static final String WEBHOOK_TOPIC_HEADER = "x-shopify-topic";
-	private static final ObjectMapper objectMapper = new ObjectMapper();
+	private static final ObjectMapper objectMapper = new ObjectMapper()
+			.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
 	private static String secret;
 
 	@Override
 	protected void doGet(HttpServletRequest reqest, HttpServletResponse response)
 			throws ServletException, IOException {
-		response.getWriter().println("Hello World!");
+		response.getWriter().println("Viome webhook receiver running..!");
 	}
 
 	@Override
