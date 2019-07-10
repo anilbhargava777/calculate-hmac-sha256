@@ -1,14 +1,25 @@
 package net.bzium.shopify;
 
+import net.bzium.shopify.Hmac;
+
+import org.eclipse.jetty.server.Connector;
+import org.eclipse.jetty.server.HttpConfiguration;
+import org.eclipse.jetty.server.HttpConnectionFactory;
+import org.eclipse.jetty.server.SecureRequestCustomizer;
 import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.server.ServerConnector;
+import org.eclipse.jetty.server.SslConnectionFactory;
 import org.eclipse.jetty.servlet.ServletHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
+import org.eclipse.jetty.util.ssl.SslContextFactory;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+
 import java.io.IOException;
+import java.util.Enumeration;
 import java.util.stream.Collectors;
 
 /**
@@ -28,16 +39,29 @@ public class WebhookServlet extends HttpServlet {
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        String webhookHmac = req.getHeader(HMAC_HEADER);
+    	System.out.println("\n\n<<--------------- New Webhook Request received --------------->>\n");
+    	Enumeration<String> headerNames = req.getHeaderNames();
+        if (headerNames != null) {
+                while (headerNames.hasMoreElements()) {
+                	String headerName = headerNames.nextElement();
+                    System.out.println("Header--"+ headerName +": " + req.getHeader(headerName));
+                }
+        }
         String body = req.getReader().lines().collect(Collectors.joining());
+        System.out.println("\nRequest body: " + body);
+        
+    	String webhookHmac = req.getHeader(HMAC_HEADER);
+        System.out.println("\nReceived hmac: " + webhookHmac);
         String hmac;
         try {
             hmac = Hmac.calculateHmac(body, secret);
         } catch (Exception e) {
             throw new ServletException(e);
         }
-        System.out.println("Received a webhook request with hmac=" + webhookHmac);
-        System.out.println("Calculated hmac=" + hmac);
+        System.out.println("Calculated hmac: " + hmac);
+        resp.setStatus(200);
+        resp.addHeader("Content-Type", "text/plain");
+        resp.getWriter().println("Webhook Request Captured..!");
     }
 
     @Override
@@ -58,10 +82,32 @@ public class WebhookServlet extends HttpServlet {
 
         secret = args[0];
 
-        Server server = new Server(8080);
+        Server server = new Server();
+     
+        HttpConfiguration http = new HttpConfiguration();
+        http.addCustomizer(new SecureRequestCustomizer());
+        http.setSecurePort(8443);
+        http.setSecureScheme("https");
+        
+        ServerConnector connector = new ServerConnector(server);
+        connector.addConnectionFactory(new HttpConnectionFactory(http));
+        connector.setPort(8080);
+ 
+        HttpConfiguration https = new HttpConfiguration();
+        https.addCustomizer(new SecureRequestCustomizer());
+ 
+        SslContextFactory sslContextFactory = new SslContextFactory();
+        sslContextFactory.setKeyStorePath("/home/ec2-user/store.jks");
+        sslContextFactory.setKeyStorePassword("changeit");
+        sslContextFactory.setKeyManagerPassword("changeit");
+ 
+        ServerConnector sslConnector = new ServerConnector(server, new SslConnectionFactory(sslContextFactory, "http/1.1"), new HttpConnectionFactory(https));
+        sslConnector.setPort(8443);
+ 
+        server.setConnectors(new Connector[]{connector, sslConnector});
+        
         ServletHandler handler = new ServletHandler();
         server.setHandler(handler);
-
         handler.addServletWithMapping(WebhookServlet.class, "/*");
         ServletHolder servletHolder = new ServletHolder(new WebhookServlet());
         handler.addServlet(servletHolder);
